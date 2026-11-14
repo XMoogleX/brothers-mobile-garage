@@ -16,6 +16,3 @@ Open `index.html` in a browser, or run `python -m http.server 8000` in this dire
 2. Server-side validation, secure data handling, backups, and audit history.
 3. Editable estimate line items, approvals, unique invoice numbers, payment tracking, and PDF output.
 4. Jurisdiction-appropriate tax handling and customer-supplied-parts terms.
-
-## Suggested repository name
-`brothers-mobile-garage`
