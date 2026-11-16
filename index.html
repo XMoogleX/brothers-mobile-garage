@@ -1,5 +1,15 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brothers Mobile Garage — Prototype</title><style>body{font:16px system-ui;background:#f5f6f8;color:#17212d;margin:0}header{background:#17212d;color:white;padding:20px}main{max-width:980px;margin:auto;padding:20px}.tabs{display:flex;gap:8px;flex-wrap:wrap}button{cursor:pointer;background:#17212d;color:white;border:0;border-radius:6px;padding:10px 14px}.tabs button{background:#e0e5eb;color:#17212d}.tabs button.active{background:#17212d;color:white}section{background:white;border-radius:10px;padding:20px;margin-top:15px;box-shadow:0 1px 4px #0001}label{display:block;margin:10px 0}input,select,textarea{box-sizing:border-box;width:100%;padding:9px;border:1px solid #bbc3cc;border-radius:5px}form{max-width:650px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.muted{color:#576474}.entry{border-bottom:1px solid #ddd;padding:10px 0}small{color:#576474}table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}@media print{header,.tabs,form,.no-print{display:none!important}body{background:white}section{box-shadow:none}}</style></head><body><header><h1>Brothers Mobile Garage</h1><div>Shop Management — Local Prototype</div></header><main><p class="muted">Demo only: data is stored in this browser, not synced or backed up. Do not enter real customer information.</p><nav class="tabs" id="tabs"></nav><div id="view"></div></main><script>
-const K='bmg-demo-v1';let db=JSON.parse(localStorage.getItem(K)||'{"customers":[],"vehicles":[],"estimates":[]}');let tab='Customers';const save=()=>localStorage.setItem(K,JSON.stringify(db));const $=id=>document.getElementById(id);const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const id = () => {
+const K='bmg-demo-v1';let db=JSON.parse(localStorage.getItem(K)||'{"customers":[],"vehicles":[],"estimates":[]}');let tab='Customers';const save = () => {
+  try {
+    localStorage.setItem(K, JSON.stringify(db));
+    alert("Information saved successfully!");
+    return true;
+  } catch (error) {
+    alert("Unable to save: " + error.message);
+    console.error("Save failed:", error);
+    return false;
+  }
+};const $=id=>document.getElementById(id);const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const id = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
     return crypto.randomUUID();
   }
