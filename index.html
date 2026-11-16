@@ -1,38 +1,777 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Brothers Mobile Garage — Prototype</title><style>body{font:16px system-ui;background:#f5f6f8;color:#17212d;margin:0}header{background:#17212d;color:white;padding:20px}main{max-width:980px;margin:auto;padding:20px}.tabs{display:flex;gap:8px;flex-wrap:wrap}button{cursor:pointer;background:#17212d;color:white;border:0;border-radius:6px;padding:10px 14px}.tabs button{background:#e0e5eb;color:#17212d}.tabs button.active{background:#17212d;color:white}section{background:white;border-radius:10px;padding:20px;margin-top:15px;box-shadow:0 1px 4px #0001}label{display:block;margin:10px 0}input,select,textarea{box-sizing:border-box;width:100%;padding:9px;border:1px solid #bbc3cc;border-radius:5px}form{max-width:650px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.muted{color:#576474}.entry{border-bottom:1px solid #ddd;padding:10px 0}small{color:#576474}table{width:100%;border-collapse:collapse}td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}@media print{header,.tabs,form,.no-print{display:none!important}body{background:white}section{box-shadow:none}}</style></head><body><header><h1>Brothers Mobile Garage</h1><div>Shop Management — Local Prototype</div></header><main><p class="muted">Demo only: data is stored in this browser, not synced or backed up. Do not enter real customer information.</p><nav class="tabs" id="tabs"></nav><div id="view"></div></main><script>
-const K='bmg-demo-v1';let db=JSON.parse(localStorage.getItem(K)||'{"customers":[],"vehicles":[],"estimates":[]}');let tab='Customers';const save = () => {
-  try {
-    localStorage.setItem(K, JSON.stringify(db));
-    alert("Information saved successfully!");
-    return true;
-  } catch (error) {
-    alert("Unable to save: " + error.message);
-    console.error("Save failed:", error);
-    return false;
-  }
-};const $=id=>document.getElementById(id);const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const id = () => {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
+<!DOCTYPE html>
+<html lang="en">
 
-  return "bmg-" + Date.now() + "-" +
-    Math.random().toString(36).slice(2);
-};;const money=n=>Number(n||0).toLocaleString('en-US',{style:'currency',currency:'USD'});function options(arr,label){return arr.map(x=>`<option value="${esc(x.id)}">${esc(label(x))}</option>`).join('')};function render(){ $('tabs').innerHTML=['Customers','Vehicles','Estimates','Invoices'].map(t=>`<button class="${tab===t?'active':''}" data-tab="${t}">${t}</button>`).join('');document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});$('view').innerHTML=({Customers:customers,Vehicles:vehicles,Estimates:estimates,Invoices:invoices})[tab]();bind()}
-function customers(){return `<section><h2>Add customer</h2><form id="customer"><div class="grid"><label>Name<input name="name" required></label><label>Phone<input name="phone"></label></div><label>Email<input name="email" type="email"></label><label>Service address<input name="address"></label><button>Add customer</button></form></section><section><h2>Customers (${db.customers.length})</h2>${db.customers.map(c=>`<div class="entry"><b>${esc(c.name)}</b><div>${esc(c.phone)} · ${esc(c.email)}</div><small>${esc(c.address)}</small></div>`).join('')||'No customers yet.'}</section>`}
-function vehicles(){return `<section><h2>Add vehicle</h2><form id="vehicle"><label>Customer<select name="customerId" required><option value="">Select customer</option>${options(db.customers,c=>c.name)}</select></label><div class="grid"><label>Year<input name="year" type="number" min="1900" max="2100" required></label><label>Make<input name="make" required></label><label>Model<input name="model" required></label><label>Mileage<input name="mileage" type="number" min="0"></label></div><label>VIN<input name="vin" maxlength="17"></label><label>License plate<input name="plate"></label><button>Add vehicle</button></form></section><section><h2>Vehicles (${db.vehicles.length})</h2>${db.vehicles.map(v=>`<div class="entry"><b>${esc(v.year)} ${esc(v.make)} ${esc(v.model)}</b><div>${esc(db.customers.find(c=>c.id===v.customerId)?.name)}</div><small>VIN: ${esc(v.vin)} · Plate: ${esc(v.plate)} · Mileage: ${esc(v.mileage)}</small></div>`).join('')||'No vehicles yet.'}</section>`}
-function calculateQuote(d){
- const n=k=>Math.max(0,Number(d[k])||0);
- const parts=Math.round(n('partsCost')*(1+n('markup')/100)*100)/100;
- const labor=d.laborType==='flat'?n('flatLabor'):n('hours')*n('rate');
- const fees=n('fees'), rate=n('taxRate')/100;
- const taxable=(d.taxParts?parts:0)+(d.taxLabor?labor:0)+(d.taxFees?fees:0);
- const tax=Math.round(taxable*rate*100)/100;
- const subtotal=Math.round((parts+labor+fees)*100)/100;
- const exact=Math.round((subtotal+tax)*100)/100;
- const total=Math.ceil((exact-0.000001));
- const adjustment=Math.round((total-exact)*100)/100;
- return {parts,labor:Math.round(labor*100)/100,fees,tax,subtotal,exact,total,adjustment};
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Brothers Mobile Garage — Prototype</title>
+
+    <style>
+        body {
+            font: 16px system-ui;
+            background: #f5f6f8;
+            color: #17212d;
+            margin: 0
+        }
+
+        header {
+            background: #17212d;
+            color: white;
+            padding: 20px
+        }
+
+        main {
+            max-width: 980px;
+            margin: auto;
+            padding: 20px
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        button {
+            cursor: pointer;
+            background: #17212d;
+            color: white;
+            border: 0;
+            border-radius: 6px;
+            padding: 10px 14px
+        }
+
+        .tabs button {
+            background: #e0e5eb;
+            color: #17212d
+        }
+
+            .tabs button.active {
+                background: #17212d;
+                color: white
+            }
+
+        section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+            box-shadow: 0 1px 4px #0001
+        }
+
+        label {
+            display: block;
+            margin: 10px 0
+        }
+
+        input, select, textarea {
+            box-sizing: border-box;
+            width: 100%;
+            padding: 9px;
+            border: 1px solid #bbc3cc;
+            border-radius: 5px
+        }
+
+        form {
+            max-width: 650px
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit,minmax(190px,1fr));
+            gap: 10px
+        }
+
+        .muted {
+            color: #576474
+        }
+
+        .entry {
+            border-bottom: 1px solid #ddd;
+            padding: 10px 0
+        }
+
+        small {
+            color: #576474
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        td, th {
+            padding: 9px;
+            border-bottom: 1px solid #ddd;
+            text-align: left
+        }
+
+        @media print {
+            header, .tabs, form, .no-print {
+                display: none !important
+            }
+
+            body {
+                background: white
+            }
+
+            section {
+                box-shadow: none
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Brothers Mobile Garage</h1>
+        <div>Shop Management — Local Prototype</div>
+    </header>
+
+    <main>
+        <p class="muted">
+            Demo only: data is stored in this browser,
+            not synced or backed up.
+            Do not enter real customer information.
+        </p>
+
+        <nav class="tabs" id="tabs"></nav>
+
+        <div id="view"></div>
+    </main>
+
+    <script>
+
+const STORAGE_KEY = 'bmg-demo-v1';
+
+let db = JSON.parse(
+                    localStorage.getItem(STORAGE_KEY) ||
+                    '{"customers":[],"vehicles":[],"estimates":[]}'
+);
+
+let activeTab = 'Customers';
+
+// SAVE DATABASE
+const saveData = () => {
+                    try {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+                        return true;
+                    } catch (error) {
+                        const message = error instanceof Error
+                            ? error.message
+                            : String(error);
+
+                        alert("Unable to save: " + message);
+                        console.error("Save failed:", error);
+                        return false;
+                    }
+};
+
+// FIND HTML ELEMENT
+const getElement = elementId =>
+                    document.getElementById(elementId);
+
+// ESCAPE HTML CHARACTERS
+const escapeHTML = value =>
+                    String(value ?? '').replace(
+                        /[&<>"']/g,
+                        character => ({
+                            '&': '&amp;',
+                            '<': '&lt;',
+                            '>': '&gt;',
+                            '"': '&quot;',
+                            "'": '&#39;'
+                        }[character])
+                    );
+
+// GENERATE UNIQUE ID
+const generateId = () => {
+                    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                        return crypto.randomUUID();
+                    }
+
+                    return 'bmg-' + Date.now() + '-' +
+                        Math.random().toString(36).slice(2);
+};
+
+// FORMAT CURRENCY
+const money = amount =>
+                    Number(amount || 0).toLocaleString('en-US', {
+                        style: 'currency',
+                        currency: 'USD'
+                    });
+
+
+// GENERATE SELECT OPTIONS
+function options(items, getLabel) {
+                    return items.map(item => `
+                        <option value="${escapeHTML(item.id)}">
+                            ${escapeHTML(getLabel(item))}
+                        </option>
+                    `).join('');
 }
-function estimates(){return `<section><h2>Create estimate</h2><form id="estimate"><label>Vehicle<select name="vehicleId" required><option value="">Select vehicle</option>${options(db.vehicles,v=>`${v.year} ${v.make} ${v.model} — ${db.customers.find(c=>c.id===v.customerId)?.name||''}`)}</select></label><label>Work description<textarea name="description" required></textarea></label><div class="grid"><label>Parts cost ($)<input name="partsCost" type="number" min="0" step=".01" value="0" required></label><label>Parts markup (%)<input name="markup" type="number" min="0" step=".01" value="0" required></label><label>Labor pricing<select name="laborType"><option value="hourly">Hourly</option><option value="flat">Flat rate</option></select></label><label>Labor hours<input name="hours" type="number" min="0" step=".01" value="0"></label><label>Hourly labor rate ($)<input name="rate" type="number" min="0" step=".01" value="100"></label><label>Flat labor charge ($)<input name="flatLabor" type="number" min="0" step=".01" value="0"></label><label>Travel / other fees ($)<input name="fees" type="number" min="0" step=".01" value="0"></label><label>Applicable sales tax rate (%)<input name="taxRate" type="number" min="0" max="100" step=".001" value="0" required></label></div><fieldset><legend>Apply sales tax to</legend><label><input type="checkbox" name="taxParts" style="width:auto"> Parts</label><label><input type="checkbox" name="taxLabor" style="width:auto"> Labor</label><label><input type="checkbox" name="taxFees" style="width:auto"> Travel / fees</label></fieldset><p class="muted">Set the applicable tax rate and taxable categories based on the repair location and current rules. Tax is calculated internally; the customer total includes it.</p><section style="box-shadow:none;border:1px solid #ddd"><h3>Live quote preview</h3><div id="quote-preview"></div></section><button>Save draft estimate</button></form></section><section><h2>Estimates (${db.estimates.length})</h2>${db.estimates.map(e=>`<div class="entry"><b>${esc(e.description)}</b> — ${money(e.total)}<div><small>${esc(e.status)} · ${esc(e.date)} · ${esc(vehicleName(e.vehicleId))}</small></div><button class="no-print" data-approve="${esc(e.id)}" ${e.status==='Approved'?'disabled':''}>Mark approved</button></div>`).join('')||'No estimates yet.'}</section>`}
-function vehicleName(vid){let v=db.vehicles.find(v=>v.id===vid);return v?`${v.year} ${v.make} ${v.model}`:'Unknown vehicle'}function invoices(){let approved=db.estimates.filter(e=>e.status==='Approved');return `<section><h2>Invoices</h2><p class="muted">Approved estimates appear here as invoice-ready records. Payment collection and official invoice numbering are not implemented.</p>${approved.map(e=>`<div class="entry"><b>${esc(vehicleName(e.vehicleId))}</b> — ${money(e.total)}<div>${esc(e.description)}</div><small>Parts: ${money(e.parts)} · Labor: ${money(e.labor)} · Fees: ${money(e.fees)} · Tax: ${money(e.tax)}</small></div>`).join('')||'Approve an estimate to see it here.'}<p><button class="no-print" onclick="window.print()">Print this page</button></p></section>`}
-function bind(){let f=$('customer');if(f)f.onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(f));db.customers.push({id:id(),...d});save();render()};f=$('vehicle');if(f)f.onsubmit=e=>{e.preventDefault();let d=Object.fromEntries(new FormData(f));db.vehicles.push({id:id(),...d});save();render()};f=$('estimate');if(f){const data=()=>{let d=Object.fromEntries(new FormData(f));for(let k of ['taxParts','taxLabor','taxFees'])d[k]=f.elements[k].checked;return d};const preview=()=>{let q=calculateQuote(data());$('quote-preview').innerHTML=`<p>Parts: ${money(q.parts)} · Labor: ${money(q.labor)} · Fees: ${money(q.fees)}</p><p>Tax: ${money(q.tax)} · Calculated total: ${money(q.exact)}</p><p>Whole-dollar adjustment: +${money(q.adjustment)}</p><h3>Customer price (tax included): ${money(q.total)}</h3>`};f.addEventListener('input',preview);f.addEventListener('change',preview);preview();f.onsubmit=e=>{e.preventDefault();let d=data(),q=calculateQuote(d);db.estimates.push({id:id(),date:new Date().toLocaleDateString(),vehicleId:d.vehicleId,description:d.description,...q,laborType:d.laborType,taxRate:Number(d.taxRate),taxParts:d.taxParts,taxLabor:d.taxLabor,taxFees:d.taxFees,status:'Draft'});save();render()}}document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>{let e=db.estimates.find(e=>e.id===b.dataset.approve);if(e){e.status='Approved';save();render()}})}render();
-</script></body></html>
+
+// RENDER FUNCTION
+
+function render() {
+
+    // CREATE NAVIGATION TABS
+    const tabs = ['Customers', 'Vehicles', 'Estimates', 'Invoices'];
+
+    getElement('tabs').innerHTML = tabs.map(tabName => `
+        <button
+            class="${activeTab === tabName ? 'active' : ''}"
+            data-tab="${tabName}">
+            ${tabName}
+        </button>
+    `).join('');
+
+    // HANDLE TAB SELECTION
+    document.querySelectorAll('[data-tab]').forEach(button => {
+        button.onclick = () => {
+            activeTab = button.dataset.tab;
+            render();
+        };
+    });
+
+    // SELECT THE CORRECT PAGE
+    const views = {
+        Customers: renderCustomers,
+        Vehicles: renderVehicles,
+        Estimates: renderEstimates,
+        Invoices: renderInvoices
+    };
+
+    getElement('view').innerHTML = views[activeTab]();
+
+    // ATTACH FORM AND BUTTON EVENTS
+    bind();
+}
+
+
+
+// CUSTOMERS
+function renderCustomers() {
+                    return `
+                        <section>
+                            <h2>Add customer</h2>
+
+                            <form id="customer">
+                                <div class="grid">
+                                    <label>
+                                        Name
+                                        <input name="name" required>
+                                    </label>
+
+                                    <label>
+                                        Phone
+                                        <input name="phone">
+                                    </label>
+                                </div>
+
+                                <label>
+                                    Email
+                                    <input name="email" type="email">
+                                </label>
+
+                                <label>
+                                    Service address
+                                    <input name="address">
+                                </label>
+
+                                <button>Add customer</button>
+                            </form>
+                        </section>
+
+                        <section>
+                            <h2>Customers (${db.customers.length})</h2>
+
+                            ${db.customers.map(customer => `
+                                <div class="entry">
+                                    <b>${escapeHTML(customer.name)}</b>
+
+                                    <div>
+                                        ${escapeHTML(customer.phone)} ·
+                                        ${escapeHTML(customer.email)}
+                                    </div>
+
+                                    <small>${escapeHTML(customer.address)}</small>
+                                </div>
+                            `).join('') || 'No customers yet.'}
+                        </section>
+                    `;
+}
+
+
+// VEHICLES
+function renderVehicles() {
+                    return `
+                        <section>
+                            <h2>Add vehicle</h2>
+
+                            <form id="vehicle">
+                                <label>
+                                    Customer
+                                    <select name="customerId" required>
+                                        <option value="">Select customer</option>
+                                        ${options(db.customers, customer => customer.name)}
+                                    </select>
+                                </label>
+
+                                <div class="grid">
+                                    <label>
+                                        Year
+                                        <input name="year" type="number"
+                                               min="1900" max="2100" required>
+                                    </label>
+
+                                    <label>
+                                        Make
+                                        <input name="make" required>
+                                    </label>
+
+                                    <label>
+                                        Model
+                                        <input name="model" required>
+                                    </label>
+
+                                    <label>
+                                        Mileage
+                                        <input name="mileage" type="number" min="0">
+                                    </label>
+                                </div>
+
+                                <label>
+                                    VIN
+                                    <input name="vin" maxlength="17">
+                                </label>
+
+                                <label>
+                                    License plate
+                                    <input name="plate">
+                                </label>
+
+                                <button>Add vehicle</button>
+                            </form>
+                        </section>
+
+                        <section>
+                            <h2>Vehicles (${db.vehicles.length})</h2>
+
+                            ${db.vehicles.map(vehicle => `
+                                <div class="entry">
+                                    <b>
+                                        ${escapeHTML(vehicle.year)}
+                                        ${escapeHTML(vehicle.make)}
+                                        ${escapeHTML(vehicle.model)}
+                                    </b>
+
+                                    <div>
+                                        ${escapeHTML(db.customers.find(
+                        customer => customer.id === vehicle.customerId
+                    )?.name)}
+                                    </div>
+
+                                    <small>
+                                        VIN: ${escapeHTML(vehicle.vin)} ·
+                                        Plate: ${escapeHTML(vehicle.plate)} ·
+                                        Mileage: ${escapeHTML(vehicle.mileage)}
+                                    </small>
+                                </div>
+                            `).join('') || 'No vehicles yet.'}
+                        </section>
+                    `;
+}
+
+// QUOTE CALCULATION
+function calculateQuote(estimateData) {
+
+                    // Convert input values to numbers, defaulting to 0 if invalid
+                    const getNumber = field =>
+                        Math.max(0, Number(estimateData[field]) || 0);
+
+                    // Calculate parts cost with markup
+                    const parts = Math.round(
+                        getNumber('partsCost') *
+                        (1 + getNumber('markup') / 100) * 100
+                    ) / 100;
+
+                    // Calculate labor cost based on type (flat or hourly)
+                    const labor = estimateData.laborType === 'flat'
+                        ? getNumber('flatLabor')
+                        : getNumber('hours') * getNumber('rate');
+
+                    // Calculate fees and tax
+                    const fees = getNumber('fees');
+                    const taxRate = getNumber('taxRate') / 100;
+
+                    // Calculate taxable amount based on selected categories
+                    const taxableAmount =
+                        (estimateData.taxParts ? parts : 0) +
+                        (estimateData.taxLabor ? labor : 0) +
+                        (estimateData.taxFees ? fees : 0);
+
+                    // Calculate tax, subtotal, exact total, and final total with rounding
+                    const tax = Math.round(
+                        taxableAmount * taxRate * 100
+                    ) / 100;
+
+                    const subtotal = Math.round((parts + labor + fees) * 100
+                    ) / 100;
+
+                    const exactTotal = Math.round((subtotal + tax) * 100
+                    ) / 100;
+
+                    const total = Math.ceil((exactTotal - 0.000001));
+
+                    const adjustment = Math.round(
+                        (total - exactTotal) * 100
+                    ) / 100;
+
+                    return {
+                        parts,
+                        labor: Math.round(labor * 100) / 100,
+                        fees,
+                        tax,
+                        subtotal,
+                        exactTotal,
+                        total,
+                        adjustment
+                    };
+}
+
+// ESTIMATES
+function renderEstimates() {
+                    return `
+                        <section>
+                            <h2>Create estimate</h2>
+
+                            <form id="estimate">
+
+                                <label>
+                                    Vehicle
+                                    <select name="vehicleId" required>
+                                        <option value="">Select vehicle</option>
+                                        ${options(db.vehicles, vehicle => `
+                                            ${vehicle.year} ${vehicle.make} ${vehicle.model} —
+                                            ${db.customers.find(
+                        customer => customer.id === vehicle.customerId
+                    )?.name || ''}
+                                        `)}
+                                    </select>
+                                </label>
+
+                                <label>
+                                    Work description
+                                    <textarea name="description" required></textarea>
+                                </label>
+
+                                <div class="grid">
+                                    <label>
+                                        Parts cost ($)
+                                        <input name="partsCost" type="number"
+                                               min="0" step=".01" value="0" required>
+                                    </label>
+
+                                    <label>
+                                        Parts markup (%)
+                                        <input name="markup" type="number"
+                                               min="0" step=".01" value="0" required>
+                                    </label>
+
+                                    <label>
+                                        Labor pricing
+                                        <select name="laborType">
+                                            <option value="hourly">Hourly</option>
+                                            <option value="flat">Flat rate</option>
+                                        </select>
+                                    </label>
+
+                                    <label>
+                                        Labor hours
+                                        <input name="hours" type="number"
+                                               min="0" step=".01" value="0">
+                                    </label>
+
+                                    <label>
+                                        Hourly labor rate ($)
+                                        <input name="rate" type="number"
+                                               min="0" step=".01" value="80">
+                                    </label>
+
+                                    <label>
+                                        Flat labor charge ($)
+                                        <input name="flatLabor" type="number"
+                                               min="0" step=".01" value="0">
+                                    </label>
+
+                                    <label>
+                                        Travel / other fees ($)
+                                        <input name="fees" type="number"
+                                               min="0" step=".01" value="0">
+                                    </label>
+
+                                    <label>
+                                        Applicable sales tax rate (%)
+                                        <input name="taxRate" type="number"
+                                               min="0" max="100" step=".001"
+                                               value="9.75" required>
+                                    </label>
+                                </div>
+
+                                <fieldset>
+                                    <legend>Apply sales tax to</legend>
+
+                                    <label>
+                                        <input type="checkbox" name="taxParts"
+                                               style="width:auto">
+                                        Parts
+                                    </label>
+
+                                    <label>
+                                        <input type="checkbox" name="taxLabor"
+                                               style="width:auto">
+                                        Labor
+                                    </label>
+
+                                    <label>
+                                        <input type="checkbox" name="taxFees"
+                                               style="width:auto">
+                                        Travel / fees
+                                    </label>
+                                </fieldset>
+
+                                <p class="muted">
+                                    Set the applicable tax rate and taxable categories
+                                    based on the repair location and current rules.
+                                    Tax is calculated internally; the customer total
+                                    includes it.
+                                </p>
+
+                                <section style="box-shadow:none;border:1px solid #ddd">
+                                    <h3>Live quote preview</h3>
+                                    <div id="quote-preview"></div>
+                                </section>
+
+                                <button>Save draft estimate</button>
+                            </form>
+                        </section>
+
+                        <section>
+                            <h2>Estimates (${db.estimates.length})</h2>
+
+                            ${db.estimates.map(estimate => `
+                                <div class="entry">
+                                    <b>${escapeHTML(estimate.description)}</b>
+                                    — ${money(estimate.total)}
+
+                                    <div>
+                                        <small>
+                                            ${escapeHTML(estimate.status)} ·
+                                            ${escapeHTML(estimate.date)} ·
+                                            ${escapeHTML(vehicleName(estimate.vehicleId))}
+                                        </small>
+                                    </div>
+
+                                    <button class="no-print"
+                                            data-approve="${escapeHTML(estimate.id)}"
+                                            ${estimate.status === 'Approved' ? 'disabled' : ''}>
+                                        Mark approved
+                                    </button>
+                                </div>
+                            `).join('') || 'No estimates yet.'}
+                        </section>
+                    `;
+}
+
+// VEHICLE NAME LOOKUP
+function vehicleName(vehicleId) {
+                    const vehicle = db.vehicles.find(
+                        vehicle => vehicle.id === vehicleId
+                    );
+
+                    return vehicle
+                        ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+                        : 'Unknown vehicle';
+}
+
+// INVOICES
+function renderInvoices() {
+                    const approvedEstimates = db.estimates.filter(
+                        estimate => estimate.status === 'Approved'
+                    );
+
+                    return `
+                        <section>
+                            <h2>Invoices</h2>
+
+                            <p class="muted">
+                                Approved estimates appear here as invoice-ready records.
+                                Payment collection and official invoice numbering
+                                are not implemented.
+                            </p>
+
+                            ${approvedEstimates.map(estimate => `
+                                <div class="entry">
+                                    <b>${escapeHTML(vehicleName(estimate.vehicleId))}</b>
+                                    — ${money(estimate.total)}
+
+                                    <div>${escapeHTML(estimate.description)}</div>
+
+                                    <small>
+                                        Parts: ${money(estimate.parts)} ·
+                                        Labor: ${money(estimate.labor)} ·
+                                        Fees: ${money(estimate.fees)} ·
+                                        Tax: ${money(estimate.tax)}
+                                    </small>
+                                </div>
+                            `).join('') || 'Approve an estimate to see it here.'}
+
+                            <p>
+                                <button class="no-print" onclick="window.print()">
+                                    Print this page
+                                </button>
+                            </p>
+                        </section>
+                    `;
+}
+
+// BIND EVENT HANDLERS
+function bind() {
+
+                    // CUSTOMER FORM
+                    const customerForm = getElement('customer');
+
+                    if (customerForm) {
+                        customerForm.onsubmit = (event) => {
+                            event.preventDefault();
+
+                            const customerData = Object.fromEntries(
+                                new FormData(customerForm)
+                            );
+
+                            db.customers.push({
+                                id: generateId(),
+                                ...customerData
+                            });
+
+                            saveData();
+                            render();
+                        };
+                    }
+
+                    // VEHICLE FORM
+                    const vehicleForm = getElement('vehicle');
+
+                    if (vehicleForm) {
+                        vehicleForm.onsubmit = (event) => {
+                            event.preventDefault();
+
+                            const vehicleData = Object.fromEntries(
+                                new FormData(vehicleForm)
+                            );
+
+                            db.vehicles.push({
+                                id: generateId(),
+                                ...vehicleData
+                            });
+
+                            saveData();
+                            render();
+                        };
+                    }
+
+                    // ESTIMATE FORM
+                    const estimateForm = getElement('estimate');
+
+                    if (estimateForm) {
+
+                        const getEstimateData = () => {
+                            const estimateData = Object.fromEntries(
+                                new FormData(estimateForm)
+                            );
+
+                            for (const taxField of ['taxParts', 'taxLabor', 'taxFees']) {
+                                estimateData[taxField] = estimateForm.elements[taxField].checked;
+                            }
+
+                            return estimateData;
+                        };
+
+                        // LIVE QUOTE PREVIEW
+                        const updateQuotePreview = () => {
+                            const quote = calculateQuote(getEstimateData());
+
+                            getElement('quote-preview').innerHTML = `
+                        <p>
+                          Parts: ${money(quote.parts)} ·
+                          Labor: ${money(quote.labor)} ·
+                          Fees: ${money(quote.fees)}
+                        </p>
+                        <p>
+                          Tax: ${money(quote.tax)} ·
+                          Calculated total: ${money(quote.exact)}
+                        </p>
+                        <p>
+                          Whole-dollar adjustment:
+                          +${money(quote.adjustment)}
+                        </p>
+                        <h3>
+                          Customer price (tax included):
+                          ${money(quote.total)}
+                        </h3>
+                      `;
+                        };
+
+                        estimateForm.addEventListener('input', updateQuotePreview);
+                        estimateForm.addEventListener('change', updateQuotePreview);
+
+                        updateQuotePreview();
+
+                        // SUBMIT ESTIMATE FORM
+                        estimateForm.onsubmit = (event) => {
+                            event.preventDefault();
+
+                            const estimateData = getEstimateData();
+                            const quote = calculateQuote(estimateData);
+
+                            db.estimates.push({
+                                id: generateId(),
+                                date: new Date().toLocaleDateString(),
+                                vehicleId: estimateData.vehicleId,
+                                description: estimateData.description,
+                                ...quote,
+                                laborType: estimateData.laborType,
+                                taxRate: Number(estimateData.taxRate),
+                                taxParts: estimateData.taxParts,
+                                taxLabor: estimateData.taxLabor,
+                                taxFees: estimateData.taxFees,
+                                status: 'Draft'
+                            });
+
+                            saveData();
+                            render();
+                        };
+                    }
+
+                    // APPROVE ESTIMATE BUTTONS
+                    document.querySelectorAll('[data-approve]').forEach(button => {
+                        button.onclick = () => {
+                            const estimate = db.estimates.find(
+                                savedEstimate => savedEstimate.id === button.dataset.approve
+                            );
+
+                            if (estimate) {
+                                estimate.status = 'Approved';
+                                saveData();
+                                render();
+                            }
+                        };
+                    });
+}
+
+render();
+    </script>
+</body>
+</html>
